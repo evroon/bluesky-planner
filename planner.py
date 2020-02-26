@@ -1,8 +1,9 @@
 """ BlueSky route planner plugin. """
-    
-from bluesky import stack, navdb  #settings, traf, sim, scr, tools
+
+from bluesky import stack, navdb
 import numpy as np
 import pyproj
+
 
 def init_plugin():
     config = {
@@ -12,7 +13,7 @@ def init_plugin():
         'update':          update,
         'preupdate':       preupdate,
         'reset':           reset
-        }
+    }
 
     stackfunctions = {
         'PLANNER': [
@@ -28,22 +29,26 @@ def init_plugin():
 def update():
     pass
 
+
 def preupdate():
     pass
+
 
 def reset():
     pass
 
-# Source: https://gis.stackexchange.com/questions/47/what-tools-in-python-are-available-for-doing-great-circle-distance-line-creati
-def create_great_circle(startlon, startlat, endlong, endlat):
-    g = pyproj.Geod(ellps='WGS84')
-    (az12, az21, dist) = g.inv(startlon, startlat, endlong, endlat)
-    lonlats = g.npts(startlon, startlat, endlong, endlat, 1 + int(dist / 10000))
 
-    # npts doesn't include start/end points, so prepend/append them
-    # lonlats.insert(0, (startlon, startlat))
-    # lonlats.append((endlong, endlat))
+def create_great_circle(startlon, startlat, endlong, endlat, seperation=100):
+    # Source: https://gis.stackexchange.com/questions/47/what-tools-in-python-are-available-for-doing-great-circle-distance-line-creati
+    # seperation is the distance between the points in km.
+
+    g = pyproj.Geod(ellps='WGS84')
+    (_, _, dist) = g.inv(startlon, startlat, endlong, endlat)
+    lonlats = g.npts(startlon, startlat, endlong, endlat, 1 + int(dist / (seperation * 1000)))
+    lonlats.insert(0, (startlon, startlat))
+    lonlats.append((endlong, endlat))
     return lonlats
+
 
 def plan(origin="EHAM", destination="VHHH"):
     origin_index = np.where(np.array(navdb.aptid) == origin)
@@ -55,12 +60,27 @@ def plan(origin="EHAM", destination="VHHH"):
     if len(destination_index) < 1:
         return False, 'Could not find destination'
 
-    origin_lon, origin_lat = navdb.aptlon[origin_index], navdb.aptlat[origin_index]
-    destination_lon, destination_lat = navdb.aptlon[destination_index], navdb.aptlat[destination_index]
-
+    origin_lon, origin_lat = navdb.aptlon[origin_index][0], navdb.aptlat[origin_index][0]
+    destination_lon, destination_lat = navdb.aptlon[destination_index][0], navdb.aptlat[destination_index][0]
     points = create_great_circle(origin_lon, origin_lat, destination_lon, destination_lat)
+    point_count = len(points)
+    middle = int(point_count / 2)
 
-    for i, p in enumerate(points):
-        stack.stack('CIRCLE ' + ','.join(['circle_point_' + str(i), str(p[1]), str(p[0]), '10']))
+    stack.stack('SWRAD APT')
+    stack.stack('SWRAD VOR')
+    stack.stack('ZOOM 0.04')
+    stack.stack('PAN {},{}'.format(points[middle][1], points[middle][0]))
 
-    return True, 'Planning a route from {} to {}'.format(origin, destination)
+    lat_e = navdb.wplat -
+
+    for i, _ in enumerate(points[:-1]):
+        current = points[i]
+        next = points[i+1]
+        stack.stack('LINE ' + ','.join(['great_circle_point_' + str(i),
+                                        str(current[1]),
+                                        str(current[0]),
+                                        str(next[1]),
+                                        str(next[0])]
+                                       ))
+
+    return True, 'Planned a route from {} to {}'.format(origin, destination)
