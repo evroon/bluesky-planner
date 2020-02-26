@@ -62,6 +62,17 @@ class Route:
         route = [navdb.wpid[x] for x in self.waypoints]
         print(route)
 
+        speed = 300
+        altitude = 'FL360'
+        stack.stack('CRE,KL887,B772,{lat},{lon},182.55957037,300,450.00000000'.format(lat=self.startlat, lon=self.startlon))
+        stack.stack('ORIG,KL887,{orig}'.format(orig=self.origin))
+        stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
+        stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
+        stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
+
+        for wpt in route:
+            stack.stack('KL887 ADDWPT {wpt} {alt} {spd}'.format(wpt=wpt, alt=altitude, spd=speed))
+
 
     def plot_great_circle(self):
         for i, _ in enumerate(self.points[:-1]):
@@ -108,6 +119,7 @@ class Route:
 
 
 # Source for all code below: https://github.com/FlightDataServices/FlightDataUtilities/blob/efda850fc9a4b77cae4fca65f4d02471098bc9c7/flightdatautilities/geometry.py
+# Math is based on this: http://www.movable-type.co.uk/scripts/latlong.html
 EARTH_RADIUS = 6371008  # volumetric mean radius (meters)
 
 def cross_track_distance(p1_lat, p1_lon, p2_lat, p2_lon, p3_lat, p3_lon):
