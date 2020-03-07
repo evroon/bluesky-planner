@@ -14,7 +14,6 @@ class Route:
         self.origin = origin
         self.destination = destination
 
-
     def calculate_great_circle(self, startlon, startlat, endlon, endlat, seperation=25):
         '''Calculate great circle from start to end
         Source: https://gis.stackexchange.com/questions/47/what-tools-in-python-are-available-for-doing-great-circle-distance-line-creati
@@ -41,15 +40,12 @@ class Route:
         grid = self.create_grid()
 
         # Calculate grid cells that overlap with great circle.
-        for p in self.points[1:]:
+        for p in self.points:
             self.active_grid[(np.floor(p[1]), np.floor(p[0]))] = True
             self.active_grid[(np.floor(p[1]), np.floor(p[0] - 1))] = True
             self.active_grid[(np.floor(p[1]), np.floor(p[0] + 1))] = True
             self.active_grid[(np.floor(p[1] - 1), np.floor(p[0]))] = True
             self.active_grid[(np.floor(p[1] + 1), np.floor(p[0]))] = True
-
-        # Disregard first cell.
-        del self.active_grid[(np.floor(self.startlat), np.floor(self.startlon))]
 
         self.waypoints = []
         threshold = 1e4 # meters
@@ -77,6 +73,27 @@ class Route:
                 # Ignore waypoints that are too far off.
                 if (dists[closest] < threshold):
                     self.waypoints.append(int(wpts[closest]))
+
+        # Remove waypoints that are not in the right direction.
+        bearing_start = initial_bearing(self.startlat, self.startlon, self.endlat, self.endlon)
+        bearing_end = (initial_bearing(self.endlat, self.endlon, self.startlat, self.startlon) - 180) % 360
+
+        i, j = 0, -1
+        for _ in range(5):
+            bearing_first = initial_bearing(self.startlat, self.startlon, navdb.wplat[self.waypoints[i]], navdb.wplon[self.waypoints[i]])
+            bearing_last = initial_bearing(navdb.wplat[self.waypoints[j]], navdb.wplon[self.waypoints[j]], self.endlat, self.endlon)
+
+            if abs(bearing_first - bearing_start) > 30:
+                print('deleting', navdb.wpid[self.waypoints[i]])
+                del self.waypoints[i]
+            else:
+                i += 1
+
+            if abs(bearing_last - bearing_end) > 30:
+                print('deleting', navdb.wpid[self.waypoints[j]])
+                del self.waypoints[j]
+            else:
+                j -= 1
 
         route = [navdb.wpid[x] for x in self.waypoints]
         print('Route is:', self.origin, ' '.join(route), self.destination)
