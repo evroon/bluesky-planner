@@ -60,6 +60,7 @@ def plan(origin="EHAM", destination="VHHH"):
 
     stack.stack('SWRAD APT')
     stack.stack('SWRAD VOR')
+    stack.stack('SWRAD SAT')
     stack.stack('ZOOM 0.02')
     stack.stack('PAN {},{}'.format(middle[1], middle[0]))
 
