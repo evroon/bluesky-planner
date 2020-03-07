@@ -7,16 +7,19 @@ import csv
 
 class Route:
     points = []
-    cache_path = 'output/grid_cache.csv'
+    speed = 300
+    altitude = 'FL360'
 
     def __init__(self, origin, destination):
         self.origin = origin
         self.destination = destination
 
 
-    def calculate_great_circle(self, startlon, startlat, endlon, endlat, seperation=50):
-        # Source: https://gis.stackexchange.com/questions/47/what-tools-in-python-are-available-for-doing-great-circle-distance-line-creati
-        # seperation is the distance between the points in km.
+    def calculate_great_circle(self, startlon, startlat, endlon, endlat, seperation=25):
+        '''Calculate great circle from start to end
+        Source: https://gis.stackexchange.com/questions/47/what-tools-in-python-are-available-for-doing-great-circle-distance-line-creati
+        seperation is the distance between the points in km.
+        '''
 
         self.startlon = startlon
         self.startlat = startlat
@@ -33,48 +36,62 @@ class Route:
 
 
     def calculate(self):
-        active_grid = {}
-        grid = self.create_cache()
+        '''Calculate route from origin to destination.'''
+        self.active_grid = {}
+        grid = self.create_grid()
 
-        for p in self.points:
-            active_grid[(np.floor(p[1]), np.floor(p[0]))] = True
+        # Calculate grid cells that overlap with great circle.
+        for p in self.points[1:]:
+            self.active_grid[(np.floor(p[1]), np.floor(p[0]))] = True
+            self.active_grid[(np.floor(p[1]), np.floor(p[0] - 1))] = True
+            self.active_grid[(np.floor(p[1]), np.floor(p[0] + 1))] = True
+            self.active_grid[(np.floor(p[1] - 1), np.floor(p[0]))] = True
+            self.active_grid[(np.floor(p[1] + 1), np.floor(p[0]))] = True
+
+        # Disregard first cell.
+        del self.active_grid[(np.floor(self.startlat), np.floor(self.startlon))]
 
         self.waypoints = []
-        threshold = 1e4
+        threshold = 1e4 # meters
 
-        for k in active_grid.keys():
+        # Calculate closest waypoint to great circle for each cell.
+        for k in self.active_grid.keys():
             if k in grid.keys():
                 wpts = grid[k].split(',')
                 dists = np.zeros(len(wpts))
 
                 for i, w in enumerate(wpts):
                     wpt = int(w)
+                    id = navdb.wpid[wpt]
                     lat = navdb.wplat[wpt]
                     lon = navdb.wplon[wpt]
-                    dists[i] = np.absolute(cross_track_distance(self.startlat, self.startlon, self.endlat, self.endlon, lat, lon))
+
+                    # Ignore waypoints with ids that look like latitude values to avoid a bug in BlueSky.
+                    if id[1:].isdigit():
+                        dists[i] = 1e10
+                    else:
+                        dists[i] = np.absolute(cross_track_distance(self.startlat, self.startlon, self.endlat, self.endlon, lat, lon))
 
                 closest = np.argmin(dists)
 
+                # Ignore waypoints that are too far off.
                 if (dists[closest] < threshold):
                     self.waypoints.append(int(wpts[closest]))
 
-
         route = [navdb.wpid[x] for x in self.waypoints]
-        print(route)
+        print('Route is:', self.origin, ' '.join(route), self.destination)
 
-        speed = 300
-        altitude = 'FL360'
-        stack.stack('CRE,KL887,B772,{lat},{lon},182.55957037,300,450.00000000'.format(lat=self.startlat, lon=self.startlon))
+        stack.stack('DEL,KL887')
+        stack.stack('CRE,KL887,B772,{lat},{lon},182.55957037,300,450'.format(lat=self.startlat, lon=self.startlon))
         stack.stack('ORIG,KL887,{orig}'.format(orig=self.origin))
-        stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
-        stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
         stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
 
         for wpt in route:
-            stack.stack('KL887 ADDWPT {wpt} {alt} {spd}'.format(wpt=wpt, alt=altitude, spd=speed))
+            stack.stack('KL887 ADDWPT {wpt} {alt} {spd}'.format(wpt=wpt, alt=self.altitude, spd=self.speed))
 
 
     def plot_great_circle(self):
+        '''Plot great circle path using lines.'''
         for i, _ in enumerate(self.points[:-1]):
             stack.stack('LINE ' + ','.join(['great_circle_point_' + str(i),
                                             str(self.points[i][1]),
@@ -85,6 +102,7 @@ class Route:
 
 
     def plot_final_route(self):
+        '''Plot calculated route using lines.'''
         first_leg = ['route_first', self.startlat, self.startlon, navdb.wplat[self.waypoints[0]], navdb.wplon[self.waypoints[0]]]
         first_leg = [str(x) for x in first_leg]
         stack.stack('LINE ' + ','.join(first_leg))
@@ -102,7 +120,19 @@ class Route:
         stack.stack('LINE ' + ','.join(last_leg))
 
 
-    def create_cache(self):
+    def plot_active_grid(self):
+        '''Plot grid cells overlapping with great circle using boxes.'''
+        for i, k in enumerate(self.active_grid.keys()):
+            stack.stack('BOX ' + ','.join(['grid_' + str(i),
+                                            str(k[0]),
+                                            str(k[1]),
+                                            str(k[0] + 1),
+                                            str(k[1] + 1)]
+                                        ))
+
+
+    def create_grid(self):
+        '''Calculate grid cells that overlap with great circle.'''
         grid = {}
         for i, _ in enumerate(navdb.wpid):
             lat = navdb.wplat[i]
@@ -114,8 +144,7 @@ class Route:
             else:
                 grid[key] = str(i)
 
-        grid = collections.OrderedDict(sorted(grid.items()))
-        return grid
+        return collections.OrderedDict(sorted(grid.items()))
 
 
 # Source for all code below: https://github.com/FlightDataServices/FlightDataUtilities/blob/efda850fc9a4b77cae4fca65f4d02471098bc9c7/flightdatautilities/geometry.py

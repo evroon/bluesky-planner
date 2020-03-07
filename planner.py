@@ -23,7 +23,6 @@ def init_plugin():
             'Plan a route from [origin] to [destination].']
     }
 
-    print(plan()[1])
     return config, stackfunctions
 
 
@@ -36,10 +35,12 @@ def preupdate():
 
 
 def reset():
+    stack.stack('DEL KL887')
     pass
 
 
 def plan(origin="EHAM", destination="VHHH"):
+    '''Plan a route from origin to destination.'''
     route = Route(origin, destination)
 
     origin_index = np.where(np.array(navdb.aptid) == origin)
@@ -55,8 +56,7 @@ def plan(origin="EHAM", destination="VHHH"):
     dest_lon, dest_lat = navdb.aptlon[destination_index][0], navdb.aptlat[destination_index][0]
     route.points = route.calculate_great_circle(orig_lon, orig_lat, dest_lon, dest_lat)
 
-    point_count = len(route.points)
-    middle = route.points[int(point_count / 2)]
+    middle = route.points[int(len(route.points) / 2)]
 
     stack.stack('SWRAD APT')
     stack.stack('SWRAD VOR')
@@ -64,7 +64,10 @@ def plan(origin="EHAM", destination="VHHH"):
     stack.stack('PAN {},{}'.format(middle[1], middle[0]))
 
     route.calculate()
-    route.plot_great_circle()
-    route.plot_final_route()
 
-    return True, 'Planned a route from {} to {}'.format(origin, destination)
+    # Uncomment lines below to plot additional data.
+    # route.plot_great_circle()
+    # route.plot_active_grid()
+    # route.plot_final_route()
+
+    return True, 'Planned a route from {} to {}.'.format(origin, destination)
