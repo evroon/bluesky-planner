@@ -84,13 +84,11 @@ class Route:
             bearing_last = initial_bearing(navdb.wplat[self.waypoints[j]], navdb.wplon[self.waypoints[j]], self.endlat, self.endlon)
 
             if abs(bearing_first - bearing_start) > 30:
-                print('deleting', navdb.wpid[self.waypoints[i]])
                 del self.waypoints[i]
             else:
                 i += 1
 
             if abs(bearing_last - bearing_end) > 30:
-                print('deleting', navdb.wpid[self.waypoints[j]])
                 del self.waypoints[j]
             else:
                 j -= 1
@@ -103,8 +101,43 @@ class Route:
         stack.stack('ORIG,KL887,{orig}'.format(orig=self.origin))
         stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
 
-        for wpt in route:
+        for i, wpt in enumerate(route):
+            lat = navdb.wplat[self.waypoints[i]]
+            lon = navdb.wplon[self.waypoints[i]]
+            stack.stack('MOVE,KL887,{lat},{lon}'.format(lat=lat, lon=lon))
             stack.stack('KL887 ADDWPT {wpt} {alt} {spd}'.format(wpt=wpt, alt=self.altitude, spd=self.speed))
+
+        stack.stack('MOVE,KL887,{lat},{lon}'.format(lat=self.startlat, lon=self.startlon))
+        self.calculate_route_length()
+
+
+    def calculate_route_length(self):
+        '''Calculate route and great circle length.'''
+        route_length = 0
+        great_circle_length = great_circle_distance__haversine(
+            self.startlat, self.startlon,
+            self.endlat, self.endlon
+        )
+
+        for i, _ in enumerate(self.waypoints[:-1]):
+            route_length += great_circle_distance__haversine(
+                navdb.wplat[self.waypoints[i]],   navdb.wplon[self.waypoints[i]],
+                navdb.wplat[self.waypoints[i+1]], navdb.wplon[self.waypoints[i+1]]
+            )
+
+        # Add start and end legs.
+        route_length += great_circle_distance__haversine(
+            self.startlat, self.startlon,
+            navdb.wplat[self.waypoints[0]], navdb.wplon[self.waypoints[0]]
+        )
+        route_length += great_circle_distance__haversine(
+            navdb.wplat[self.waypoints[-1]], navdb.wplon[self.waypoints[-1]],
+            self.endlat, self.endlon
+        )
+
+        print('Great circle length: {0:.0f}km'.format(great_circle_length / 1000))
+        print('Calculated route length: {0:.0f}km'.format(route_length / 1000))
+        print('Percentual increase in length: {0:.3f}%'.format((route_length / great_circle_length - 1) * 1e2))
 
 
     def plot_great_circle(self):
