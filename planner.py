@@ -46,10 +46,10 @@ def plan(origin="EHAM", destination="VHHH"):
     origin_index = np.where(np.array(navdb.aptid) == origin)
     destination_index = np.where(np.array(navdb.aptid) == destination)
 
-    if len(origin_index) < 1:
+    if len(origin_index[0]) < 1:
         return False, 'Could not find origin'
 
-    if len(destination_index) < 1:
+    if len(destination_index[0]) < 1:
         return False, 'Could not find destination'
 
     orig_lon, orig_lat = navdb.aptlon[origin_index][0], navdb.aptlat[origin_index][0]
