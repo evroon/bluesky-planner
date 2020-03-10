@@ -135,9 +135,11 @@ class Route:
             self.endlat, self.endlon
         )
 
-        print('Great circle length: {0:.0f}km'.format(great_circle_length / 1000))
-        print('Calculated route length: {0:.0f}km'.format(route_length / 1000))
-        print('Percentual increase in length: {0:.3f}%'.format((route_length / great_circle_length - 1) * 1e2))
+        m_to_nm = 0.000539956803
+        stack.stack('ECHO Great circle length: {0:.0f}nm'.format(great_circle_length * m_to_nm))
+        stack.stack('ECHO Calculated route length: {0:.0f}nm'.format(route_length * m_to_nm))
+        stack.stack('ECHO Increase in length: {0:.3f}nm'.format(m_to_nm * (route_length - great_circle_length)))
+        stack.stack('ECHO Percentual increase in length: {0:.3f}%'.format((route_length / great_circle_length - 1) * 1e2))
 
 
     def plot_great_circle(self):
