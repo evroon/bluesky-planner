@@ -10,7 +10,8 @@ class Route:
     speed = 300
     altitude = 'FL360'
 
-    def __init__(self, origin, destination):
+    def __init__(self, acid, origin, destination):
+        self.acid = acid
         self.origin = origin
         self.destination = destination
 
@@ -93,21 +94,24 @@ class Route:
             else:
                 j -= 1
 
+        # Insert route in BlueSky as flight plan.
         route = [navdb.wpid[x] for x in self.waypoints]
-        print('Route is:', self.origin, ' '.join(route), self.destination)
+        stack.stack('ECHO Route is: ' + self.origin + ' ' + ' '.join(route) + ' ' + self.destination)
 
-        stack.stack('DEL,KL887')
-        stack.stack('CRE,KL887,B772,{lat},{lon},182.55957037,300,450'.format(lat=self.startlat, lon=self.startlon))
-        stack.stack('ORIG,KL887,{orig}'.format(orig=self.origin))
-        stack.stack('DEST,KL887,{dest}'.format(dest=self.destination))
+        stack.stack('DEL,{acid}'.format(acid=self.acid))
+        stack.stack('CRE,{acid},B772,{lat},{lon},183,300,450'.format(acid=self.acid, lat=self.startlat, lon=self.startlon))
+        stack.stack('ORIG,{acid},{orig}'.format(acid=self.acid, orig=self.origin))
+        stack.stack('DEST,{acid},{dest}'.format(acid=self.acid, dest=self.destination))
 
+        # Add waypoints. Move aircraft for each wayoint to find closest waypoint
+        # to last waypoint if there are multiple matches.
         for i, wpt in enumerate(route):
             lat = navdb.wplat[self.waypoints[i]]
             lon = navdb.wplon[self.waypoints[i]]
-            stack.stack('MOVE,KL887,{lat},{lon}'.format(lat=lat, lon=lon))
-            stack.stack('KL887 ADDWPT {wpt} {alt} {spd}'.format(wpt=wpt, alt=self.altitude, spd=self.speed))
+            stack.stack('MOVE,{acid},{lat},{lon}'.format(acid=self.acid, lat=lat, lon=lon))
+            stack.stack('{acid} ADDWPT {wpt} {alt} {spd}'.format(acid=self.acid, wpt=wpt, alt=self.altitude, spd=self.speed))
 
-        stack.stack('MOVE,KL887,{lat},{lon}'.format(lat=self.startlat, lon=self.startlon))
+        stack.stack('MOVE,{acid},{lat},{lon}'.format(acid=self.acid, lat=self.startlat, lon=self.startlon))
         self.calculate_route_length()
 
 

@@ -4,6 +4,8 @@ from bluesky import stack, navdb
 import numpy as np
 from route import Route
 
+acid = ""
+
 
 def init_plugin():
     config = {
@@ -17,10 +19,12 @@ def init_plugin():
 
     stackfunctions = {
         'PLANNER': [
-            'planner origin destination',
-            '[txt, txt]',
+            'planner acid origin destination',
+
+            # Cannot use acid as first parameter as aircraft doesn't exist yet.
+            '[txt, txt, txt]',
             plan,
-            'Plan a route from [origin] to [destination].']
+            'Create aircraft [acid] and plan a route from [origin] to [destination].']
     }
 
     return config, stackfunctions
@@ -35,13 +39,24 @@ def preupdate():
 
 
 def reset():
-    stack.stack('DEL KL887')
     pass
 
 
-def plan(origin="EHAM", destination="VHHH"):
+def plan(p_acid="KL887", origin="EHAM", destination="VHHH"):
     '''Plan a route from origin to destination.'''
-    route = Route(origin, destination)
+    global acid
+
+    # If this is the first the function is called, set radar settings.
+    # Otherwise, delete the previous aircraft and keep radar settings.
+    if acid != '':
+        stack.stack('DEL ' + acid)
+    else:
+        stack.stack('SWRAD APT')
+        stack.stack('SWRAD VOR')
+        stack.stack('SWRAD SAT')
+
+    acid = p_acid
+    route = Route(acid, origin, destination)
 
     origin_index = np.where(np.array(navdb.aptid) == origin)
     destination_index = np.where(np.array(navdb.aptid) == destination)
@@ -58,9 +73,6 @@ def plan(origin="EHAM", destination="VHHH"):
 
     middle = route.points[int(len(route.points) / 2)]
 
-    stack.stack('SWRAD APT')
-    stack.stack('SWRAD VOR')
-    stack.stack('SWRAD SAT')
     stack.stack('ZOOM 0.02')
     stack.stack('PAN {},{}'.format(middle[1], middle[0]))
 
