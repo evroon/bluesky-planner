@@ -34,7 +34,6 @@ class Route:
         self.points = np.array(self.points)
         return self.points
 
-
     def calculate(self):
         '''Calculate route from origin to destination.'''
         self.active_grid = {}
@@ -75,7 +74,7 @@ class Route:
                 if (dists[closest] < threshold):
                     self.waypoints.append(int(wpts[closest]))
 
-        # Remove waypoints that are not in the right direction.
+        # Remove first and last 5 waypoints that are not in the right direction (off by 30 deg or more) from desired bearing.
         bearing_start = initial_bearing(self.startlat, self.startlon, self.endlat, self.endlon)
         bearing_end = (initial_bearing(self.endlat, self.endlon, self.startlat, self.startlon) - 180) % 360
 
@@ -114,7 +113,6 @@ class Route:
         stack.stack('MOVE,{acid},{lat},{lon}'.format(acid=self.acid, lat=self.startlat, lon=self.startlon))
         self.calculate_route_length()
 
-
     def calculate_route_length(self):
         '''Calculate route and great circle length.'''
         route_length = 0
@@ -142,9 +140,8 @@ class Route:
         m_to_nm = 0.000539956803
         stack.stack('ECHO Great circle length: {0:.0f}nm'.format(great_circle_length * m_to_nm))
         stack.stack('ECHO Calculated route length: {0:.0f}nm'.format(route_length * m_to_nm))
-        stack.stack('ECHO Increase in length: {0:.3f}nm'.format(m_to_nm * (route_length - great_circle_length)))
+        stack.stack('ECHO Increase in length: {0:.2f}nm'.format(m_to_nm * (route_length - great_circle_length)))
         stack.stack('ECHO Percentual increase in length: {0:.3f}%'.format((route_length / great_circle_length - 1) * 1e2))
-
 
     def plot_great_circle(self):
         '''Plot great circle path using lines.'''
@@ -155,7 +152,6 @@ class Route:
                                             str(self.points[i+1][1]),
                                             str(self.points[i+1][0])]
                                         ))
-
 
     def plot_final_route(self):
         '''Plot calculated route using lines.'''
@@ -175,7 +171,6 @@ class Route:
         last_leg = [str(x) for x in last_leg]
         stack.stack('LINE ' + ','.join(last_leg))
 
-
     def plot_active_grid(self):
         '''Plot grid cells overlapping with great circle using boxes.'''
         for i, k in enumerate(self.active_grid.keys()):
@@ -188,7 +183,7 @@ class Route:
 
 
     def create_grid(self):
-        '''Calculate grid cells that overlap with great circle.'''
+        '''Put every waypoint of navdb in an ordered dict (grid).'''
         grid = {}
         for i, _ in enumerate(navdb.wpid):
             lat = navdb.wplat[i]
