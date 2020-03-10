@@ -48,7 +48,8 @@ class Route:
             self.active_grid[(np.floor(p[1] + 1), np.floor(p[0]))] = True
 
         self.waypoints = []
-        threshold = 1e4 # meters
+        cross_threshold = 1e4 # meters
+        along_threshold = 5e4 # meters
 
         # Calculate closest waypoint to great circle for each cell.
         for k in self.active_grid.keys():
@@ -61,9 +62,19 @@ class Route:
                     id = navdb.wpid[wpt]
                     lat = navdb.wplat[wpt]
                     lon = navdb.wplon[wpt]
+                    wp_dist = great_circle_distance__haversine(self.startlat, self.startlon, lat, lon)
+
+                    if len(self.waypoints) > 0:
+                        last_wp = self.waypoints[-1]
+                        last_wp_lat = navdb.wplat[last_wp]
+                        last_wp_lon = navdb.wplon[last_wp]
+                        last_wp_dist = great_circle_distance__haversine(self.startlat, self.startlon, last_wp_lat, last_wp_lon)
+                    else:
+                        last_wp_dist = 0
 
                     # Ignore waypoints with ids that look like latitude values to avoid a bug in BlueSky.
-                    if id[1:].isdigit():
+                    # Also ignore waypoints that are too close to eachother or even behind the previous wp.
+                    if id[1:].isdigit() or last_wp_dist + along_threshold > wp_dist:
                         dists[i] = 1e10
                     else:
                         dists[i] = np.absolute(cross_track_distance(self.startlat, self.startlon, self.endlat, self.endlon, lat, lon))
@@ -71,7 +82,7 @@ class Route:
                 closest = np.argmin(dists)
 
                 # Ignore waypoints that are too far off.
-                if (dists[closest] < threshold):
+                if (dists[closest] < cross_threshold):
                     self.waypoints.append(int(wpts[closest]))
 
         # Remove first and last 5 waypoints that are not in the right direction (off by 30 deg or more) from desired bearing.
